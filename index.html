@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seekr Search</title>
+    <!-- Tailwind CSS for rapid styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#202124',
+                        card: '#303134',
+                        accent: '#8ab4f8',
+                        textMain: '#bdc1c6',
+                        textMuted: '#9aa0a6'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .line-clamp-6 {
+            display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .line-clamp-2 {
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        
+        /* Global Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #202124; }
+        ::-webkit-scrollbar-thumb { background: #5f6368; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #767a7f; }
+        
+        /* Hide scrollbar for Tabs while preserving swipe on mobile */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-dark text-textMain min-h-screen font-sans selection:bg-accent selection:text-dark">
+
+    <!-- Top Navigation / Search Bar -->
+    <header class="sticky top-0 z-50 bg-dark/95 backdrop-blur-sm pt-6 px-4 sm:px-8 flex flex-col gap-4 shadow-sm border-b border-gray-700/50">
+        
+        <!-- Row 1: Logo, Search Bar & Settings Controls -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full relative">
+            <!-- Logo Container -->
+            <div class="text-3xl font-bold tracking-tighter text-white flex items-center gap-2 select-none">
+                <i data-lucide="globe" class="text-accent w-8 h-8"></i>
+                seekr
+            </div>
+            
+            <!-- Search Form Container -->
+            <div class="w-full max-w-2xl flex items-center gap-2 relative">
+                <form id="searchForm" class="w-full relative group">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search the local index..." 
+                        class="w-full bg-card border border-gray-600 hover:border-gray-500 text-gray-100 rounded-full pl-5 pr-20 py-3 focus:outline-none focus:border-accent focus:bg-card shadow-sm transition-all"
+                        autocomplete="off"
+                    >
+                    <!-- Quick Clear Button -->
+                    <button type="button" id="clearSearchInput" class="hidden absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-textMuted hover:text-white transition-colors rounded-full">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                    <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-textMuted hover:text-accent transition-colors rounded-full">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </button>
+                </form>
+
+                <!-- Settings Toggle Button -->
+                <button id="settingsToggleBtn" class="p-3 bg-card border border-gray-600 hover:border-gray-500 hover:bg-gray-800 text-textMuted hover:text-accent transition-colors rounded-full relative" title="Search Settings">
+                    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                </button>
+
+                <!-- Absolute Settings Dropdown Panel -->
+                <div id="settingsPanel" class="hidden absolute top-full right-0 mt-2 w-72 bg-card border border-gray-700 rounded-2xl shadow-2xl p-5 z-50 fade-in">
+                    <h4 class="text-white font-medium mb-4 flex items-center gap-2 text-sm border-b border-gray-700 pb-2">
+                        <i data-lucide="settings" class="w-4 h-4"></i> Preferences
+                    </h4>
+                    
+                    <div class="flex flex-col gap-4 text-xs">
+                        <!-- Sort Setting -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-gray-400 font-semibold uppercase tracking-wider">Sort Results By</label>
+                            <select id="settingSort" class="bg-dark border border-gray-700 rounded-lg p-2 text-gray-200 focus:outline-none focus:border-accent">
+                                <option value="score">Best Match (Relevance Score)</option>
+                                <option value="rank">Domain Authority (Rank)</option>
+                                <option value="depth">Page Depth (Shallowest First)</option>
+                            </select>
+                        </div>
+
+                        <!-- Limit Setting -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-gray-400 font-semibold uppercase tracking-wider">Results Limit</label>
+                            <select id="settingLimit" class="bg-dark border border-gray-700 rounded-lg p-2 text-gray-200 focus:outline-none focus:border-accent">
+                                <option value="10">10 Results</option>
+                                <option value="20">20 Results</option>
+                                <option value="50" selected>50 Results (Default)</option>
+                                <option value="100">100 Results</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Searches Dropdown Panel -->
+                <div id="historyPanel" class="hidden absolute top-full left-0 right-[56px] mt-2 bg-card border border-gray-700 rounded-2xl shadow-2xl z-50 overflow-hidden fade-in">
+                    <div class="p-3 bg-[#2a2b2e] border-b border-gray-700 flex justify-between items-center text-xs">
+                        <span class="text-gray-400 font-semibold flex items-center gap-1"><i data-lucide="history" class="w-3.5 h-3.5"></i> RECENT SEARCHES</span>
+                        <button id="clearHistoryBtn" class="text-accent hover:underline">Clear all</button>
+                    </div>
+                    <ul id="historyList" class="max-h-60 overflow-y-auto divide-y divide-gray-700/50">
+                        <!-- Populated dynamically -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Navigation Tabs -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full mt-2">
+            <!-- Tab Buttons Container -->
+            <div class="flex items-center gap-6 text-sm font-medium text-textMuted w-full overflow-x-auto no-scrollbar pt-1 pb-0">
+                <button class="tab-btn active text-accent border-b-[3px] border-accent pb-3 -mb-[1px] flex items-center gap-1.5 transition-colors whitespace-nowrap" data-tab="all">
+                    <i data-lucide="search" class="w-4 h-4"></i> All
+                </button>
+                <button class="tab-btn hover:text-gray-200 pb-3 -mb-[1px] border-b-[3px] border-transparent flex items-center gap-1.5 transition-colors whitespace-nowrap" data-tab="images">
+                    <i data-lucide="image" class="w-4 h-4"></i> Images
+                </button>
+                <button class="tab-btn hover:text-gray-200 pb-3 -mb-[1px] border-b-[3px] border-transparent flex items-center gap-1.5 transition-colors whitespace-nowrap" data-tab="videos">
+                    <i data-lucide="video" class="w-4 h-4"></i> Videos
+                </button>
+                <button class="tab-btn hover:text-gray-200 pb-3 -mb-[1px] border-b-[3px] border-transparent flex items-center gap-1.5 transition-colors whitespace-nowrap" data-tab="news">
+                    <i data-lucide="newspaper" class="w-4 h-4"></i> News
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="px-4 sm:px-8 py-6 w-full flex flex-col sm:flex-row gap-4 sm:gap-6">
+        
+        <!-- Main Workspace -->
+        <div class="flex-1 w-full min-w-0">
+            
+            <!-- Loading State -->
+            <div id="loadingIndicator" class="hidden flex items-center gap-3 text-textMuted mt-4 mb-6">
+                <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+                <span>Searching database...</span>
+            </div>
+
+            <!-- TAB CONTENT: ALL -->
+            <div id="tabAll" class="flex flex-col lg:flex-row gap-8 relative w-full">
+                
+                <!-- Main Results Column -->
+                <div class="flex-1 w-full max-w-3xl flex flex-col gap-6 pb-16">
+                    <!-- Stats / Status Line -->
+                    <div id="statsContainer" class="text-sm text-textMuted hidden mb-[-10px]"></div>
+                    
+                    <div id="resultsContainer" class="flex flex-col gap-7">
+                        <div id="emptyState" class="text-center mt-20 text-gray-500 col-span-full">
+                            <i data-lucide="compass" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+                            <h2 class="text-xl">Discover the Web</h2>
+                            <p class="mt-2 text-sm">Enter a query above to search the local database.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Knowledge Panel / Wikipedia Spot (Sidebar on the right) -->
+                <aside class="w-full lg:w-[350px] flex-shrink-0">
+                    <div id="wikiPanel" class="sticky top-40 hidden"></div>
+                </aside>
+            </div>
+
+            <!-- TAB CONTENT: IMAGES -->
+            <div id="tabImages" class="hidden pb-16">
+                <div id="imagesContainer" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="imagesEmptyState" class="hidden text-center mt-20 text-gray-500 w-full">
+                    <i data-lucide="image-off" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+                    <h2 class="text-xl">No images found</h2>
+                    <p class="mt-2 text-sm">We couldn't find any relevant images for this query.</p>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT: VIDEOS -->
+            <div id="tabVideos" class="hidden pb-16">
+                <div id="videosContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="videosEmptyState" class="hidden text-center mt-20 text-gray-500 w-full">
+                    <i data-lucide="video-off" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+                    <h2 class="text-xl">No videos found</h2>
+                    <p class="mt-2 text-sm">We couldn't find any video links in your local index.</p>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT: NEWS -->
+            <div id="tabNews" class="hidden pb-16">
+                <div id="newsContainer" class="flex flex-col gap-6 max-w-3xl">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="newsEmptyState" class="hidden text-center mt-20 text-gray-500 w-full max-w-3xl">
+                    <i data-lucide="newspaper" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+                    <h2 class="text-xl">No news found</h2>
+                    <p class="mt-2 text-sm">No results from top news outlets were found for this query.</p>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <!-- Scroll to Top Button -->
+    <button id="scrollToTopBtn" class="fixed bottom-6 right-6 p-3 bg-accent hover:bg-blue-300 text-dark rounded-full shadow-2xl transition-all opacity-0 pointer-events-none scale-75 z-40" title="Back to top">
+        <i data-lucide="arrow-up" class="w-6 h-6 font-bold"></i>
+    </button>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        const API_URL = 'http://127.0.0.1:5000/api/search';
+        
+        // DOM Elements
+        const searchForm = document.getElementById('searchForm');
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchInput = document.getElementById('clearSearchInput');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const emptyState = document.getElementById('emptyState');
+        const wikiPanel = document.getElementById('wikiPanel');
+        
+        // Settings Elements
+        const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const settingSort = document.getElementById('settingSort');
+        const settingLimit = document.getElementById('settingLimit');
+        
+        // History Elements
+        const historyPanel = document.getElementById('historyPanel');
+        const historyList = document.getElementById('historyList');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        // Scroll to top Element
+        const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+        
+        // Tab Containers & Empty States
+        const tabBtns = document.querySelectorAll('.tab-btn[data-tab]');
+        
+        const tabAll = document.getElementById('tabAll');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const statsContainer = document.getElementById('statsContainer');
+        
+        const tabImages = document.getElementById('tabImages');
+        const imagesContainer = document.getElementById('imagesContainer');
+        const imagesEmptyState = document.getElementById('imagesEmptyState');
+
+        const tabVideos = document.getElementById('tabVideos');
+        const videosContainer = document.getElementById('videosContainer');
+        const videosEmptyState = document.getElementById('videosEmptyState');
+
+        const tabNews = document.getElementById('tabNews');
+        const newsContainer = document.getElementById('newsContainer');
+        const newsEmptyState = document.getElementById('newsEmptyState');
+
+        // Global State variables
+        let currentQuery = '';
+        let currentTab = 'all';
+        let cachedRawResults = []; // Cache retrieved API results for instant dynamic sorting!
+
+        // Parse URL params on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const query = urlParams.get('q');
+            if (query) {
+                searchInput.value = query;
+                clearSearchInput.classList.remove('hidden');
+                performSearch(query);
+            }
+            renderHistoryList();
+        });
+
+        // -----------------------------------------------------
+        // SCROLL TO TOP MANAGEMENT
+        // -----------------------------------------------------
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollToTopBtn.classList.remove('opacity-0', 'pointer-events-none', 'scale-75');
+                scrollToTopBtn.classList.add('opacity-100', 'pointer-events-all', 'scale-100');
+            } else {
+                scrollToTopBtn.classList.add('opacity-0', 'pointer-events-none', 'scale-75');
+                scrollToTopBtn.classList.remove('opacity-100', 'pointer-events-all', 'scale-100');
+            }
+        });
+
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // -----------------------------------------------------
+        // SEARCH INPUT AND INSTANT CLEAR
+        // -----------------------------------------------------
+        searchInput.addEventListener('input', () => {
+            if (searchInput.value.trim().length > 0) {
+                clearSearchInput.classList.remove('hidden');
+            } else {
+                clearSearchInput.classList.add('hidden');
+            }
+        });
+
+        clearSearchInput.addEventListener('click', () => {
+            searchInput.value = '';
+            clearSearchInput.classList.add('hidden');
+            searchInput.focus();
+        });
+
+        // -----------------------------------------------------
+        // SETTINGS & RE-SORTING WITHOUT NEW API REQUESTS
+        // -----------------------------------------------------
+        settingsToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsPanel.classList.toggle('hidden');
+            historyPanel.classList.add('hidden'); // Ensure history is closed
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.contains(e.target) && e.target !== settingsToggleBtn) {
+                settingsPanel.classList.add('hidden');
+            }
+            if (!historyPanel.contains(e.target) && e.target !== searchInput) {
+                historyPanel.classList.add('hidden');
+            }
+        });
+
+        settingSort.addEventListener('change', () => {
+            if (cachedRawResults.length > 0) {
+                reprocessAndDisplay(cachedRawResults);
+            }
+        });
+
+        settingLimit.addEventListener('change', () => {
+            if (currentQuery) {
+                performSearch(currentQuery); // Perform a fresh query with adjusted limit parameters
+            }
+        });
+
+        // -----------------------------------------------------
+        // HISTORY MANAGER (Saved to Local Storage Safely)
+        // -----------------------------------------------------
+        function getSearchHistory() {
+            try {
+                return JSON.parse(localStorage.getItem('seekr_search_history')) || [];
+            } catch (e) { return []; }
+        }
+
+        function saveSearchHistory(query) {
+            if (!query || query.trim() === '') return;
+            let history = getSearchHistory();
+            history = history.filter(item => item !== query); // Deduplicate
+            history.unshift(query); // Add to the top
+            history = history.slice(0, 10); // Keep max 10 records
+            localStorage.setItem('seekr_search_history', JSON.stringify(history));
+            renderHistoryList();
+        }
+
+        function deleteHistoryItem(item, e) {
+            e.stopPropagation();
+            let history = getSearchHistory();
+            history = history.filter(h => h !== item);
+            localStorage.setItem('seekr_search_history', JSON.stringify(history));
+            renderHistoryList();
+        }
+
+        function renderHistoryList() {
+            const history = getSearchHistory();
+            if (history.length === 0) {
+                historyList.innerHTML = `<li class="p-4 text-xs text-center text-textMuted select-none">No recent searches yet</li>`;
+                return;
+            }
+
+            historyList.innerHTML = history.map(item => `
+                <li class="flex justify-between items-center px-4 py-2.5 hover:bg-[#3e3f42] cursor-pointer text-sm text-gray-200 transition-colors" onclick="handleHistoryClick('${item.replace(/'/g, "\\'")}')">
+                    <span class="flex items-center gap-2 truncate">
+                        <i data-lucide="clock" class="w-4 h-4 text-textMuted flex-shrink-0"></i> ${item}
+                    </span>
+                    <button class="p-1 text-textMuted hover:text-red-400 transition-colors rounded-full" onclick="deleteHistoryItem('${item.replace(/'/g, "\\'")}', event)" title="Remove item">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                </li>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function handleHistoryClick(query) {
+            searchInput.value = query;
+            clearSearchInput.classList.remove('hidden');
+            historyPanel.classList.add('hidden');
+            performSearch(query);
+        }
+
+        searchInput.addEventListener('focus', () => {
+            renderHistoryList();
+            historyPanel.classList.remove('hidden');
+            settingsPanel.classList.add('hidden');
+        });
+
+        clearHistoryBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            localStorage.setItem('seekr_search_history', JSON.stringify([]));
+            renderHistoryList();
+        });
+
+        // -----------------------------------------------------
+        // COPY LINK ACTIONS WITH SECURE IFRAME-SAFE BACKUP
+        // -----------------------------------------------------
+        window.copyUrlToClipboard = function(url, btn) {
+            const tempInput = document.createElement('input');
+            tempInput.setAttribute('value', url);
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            
+            // Temporary animation to indicate copied state
+            const icon = btn.querySelector('i');
+            const originalIcon = icon.getAttribute('data-lucide');
+            icon.setAttribute('data-lucide', 'check');
+            btn.classList.remove('text-textMuted');
+            btn.classList.add('text-green-400');
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                icon.setAttribute('data-lucide', originalIcon);
+                btn.classList.remove('text-green-400');
+                btn.classList.add('text-textMuted');
+                lucide.createIcons();
+            }, 1500);
+        };
+
+        // Tab Switching Logic
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+                if (targetTab === currentTab) return;
+                
+                // Update UI Buttons
+                tabBtns.forEach(b => {
+                    b.classList.remove('text-accent', 'border-accent');
+                    b.classList.add('border-transparent', 'hover:text-gray-200');
+                });
+                btn.classList.add('text-accent', 'border-accent');
+                btn.classList.remove('border-transparent', 'hover:text-gray-200');
+                
+                // Hide all tabs
+                tabAll.classList.add('hidden');
+                tabImages.classList.add('hidden');
+                tabVideos.classList.add('hidden');
+                tabNews.classList.add('hidden');
+
+                // Show target tab
+                currentTab = targetTab;
+                if (currentTab === 'all') tabAll.classList.remove('hidden');
+                else if (currentTab === 'images') {
+                    tabImages.classList.remove('hidden');
+                    if (currentQuery && !imagesContainer.innerHTML) fetchImages(currentQuery);
+                }
+                else if (currentTab === 'videos') tabVideos.classList.remove('hidden');
+                else if (currentTab === 'news') tabNews.classList.remove('hidden');
+            });
+        });
+
+        // Form Submit Handler
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            const newUrl = `${window.location.pathname}?q=${encodeURIComponent(query)}`;
+            window.history.pushState({path: newUrl}, '', newUrl);
+
+            performSearch(query);
+        });
+
+        // Highlight matching terms in titles
+        function highlightText(text, query) {
+            if (!query) return text;
+            const words = query.split(/\s+/).filter(w => w.length > 2);
+            let highlighted = text;
+            words.forEach(word => {
+                const regex = new RegExp(`(${word})`, 'gi');
+                highlighted = highlighted.replace(regex, '<span class="text-gray-100 font-semibold">$1</span>');
+            });
+            return highlighted;
+        }
+
+        // Domain Filters
+        function isVideoURL(url) {
+            return Boolean(url.match(/(youtube\.com\/watch|youtu\.be|vimeo\.com|dailymotion\.com\/video)/i));
+        }
+
+        function getYouTubeId(url) {
+            const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+            return match ? match[1] : null;
+        }
+
+        function isNewsURL(url) {
+            const newsDomains = [
+                'news.google.com', 'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 
+                'reuters.com', 'foxnews.com', 'wsj.com', 'theguardian.com', 'washingtonpost.com', 
+                'bloomberg.com', 'cnbc.com', 'aljazeera.com', 'apnews.com', 'npr.org', 
+                'usatoday.com', 'news.yahoo.com', 'independent.co.uk'
+            ];
+            try {
+                let checkUrl = url.match(/^https?:\/\//i) ? url : 'https://' + url;
+                const hostname = new URL(checkUrl).hostname.toLowerCase();
+                return newsDomains.some(d => hostname.includes(d));
+            } catch(e) { return false; }
+        }
+
+        // Search Function
+        async function performSearch(query) {
+            currentQuery = query;
+            saveSearchHistory(query);
+            if (emptyState) emptyState.remove();
+            
+            // Clear all containers
+            resultsContainer.innerHTML = '';
+            imagesContainer.innerHTML = '';
+            videosContainer.innerHTML = '';
+            newsContainer.innerHTML = '';
+            
+            // Hide specific UI elements
+            statsContainer.classList.add('hidden');
+            wikiPanel.classList.add('hidden'); 
+            imagesEmptyState.classList.add('hidden');
+            videosEmptyState.classList.add('hidden');
+            newsEmptyState.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            historyPanel.classList.add('hidden');
+            
+            document.title = `${query} - seekr`;
+
+            const startTime = performance.now();
+
+            fetchWikipediaSummary(query);
+            if (currentTab === 'images') fetchImages(query);
+
+            const limitVal = settingLimit.value || 50;
+
+            try {
+                const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}&limit=${limitVal}`);
+                if (!response.ok) throw new Error('API is offline.');
+
+                const data = await response.json();
+                const endTime = performance.now();
+                const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
+
+                // Cache the fresh results
+                cachedRawResults = data.results || [];
+
+                // Display, filter, and sort
+                reprocessAndDisplay(cachedRawResults, timeTaken);
+                
+            } catch (error) {
+                loadingIndicator.classList.add('hidden');
+                resultsContainer.innerHTML = `
+                    <div class="bg-red-900/10 border border-red-900/50 text-red-400 p-4 rounded-xl flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-medium text-red-300">Connection Error</h3>
+                            <p class="text-sm mt-1">Failed to connect to the local API. Ensure <code>search_engine.py</code> is running on port 5000.</p>
+                        </div>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        // Handle client-side sorting configuration choices instantly
+        function reprocessAndDisplay(rawResults, timeTaken) {
+            const sortBy = settingSort.value || 'score';
+            
+            // Clone results and apply desired sort order
+            let results = [...rawResults];
+            if (sortBy === 'score') {
+                results.sort((a, b) => b.score - a.score);
+            } else if (sortBy === 'rank') {
+                // Low rank domain rank is best (e.g. #1 Google vs #1,000,000 blog)
+                results.sort((a, b) => {
+                    const rA = a.rank === "Unranked" ? 99999999 : Number(a.rank);
+                    const rB = b.rank === "Unranked" ? 99999999 : Number(b.rank);
+                    return rA - rB;
+                });
+            } else if (sortBy === 'depth') {
+                // Low depth is best (Homepages/root first)
+                results.sort((a, b) => {
+                    const dA = a.depth === "Unknown" ? 999 : Number(a.depth);
+                    const dB = b.depth === "Unknown" ? 999 : Number(b.depth);
+                    return dA - dB;
+                });
+            }
+
+            // Render ALL tabs instantly
+            renderResults(results, timeTaken);
+            renderVideos(results, currentQuery);
+            renderNews(results, currentQuery);
+        }
+
+        // Render Text Results (All Tab)
+        function renderResults(results, timeTaken) {
+            loadingIndicator.classList.add('hidden');
+            statsContainer.classList.remove('hidden');
+
+            if (results.length === 0) {
+                statsContainer.innerHTML = `Your search - <b class="text-gray-200">${currentQuery}</b> - did not match any documents in the local index.`;
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            if (timeTaken) {
+                statsContainer.innerHTML = `About ${results.length} results (${timeTaken} seconds)`;
+            }
+
+            const resultsHTML = results.map((result, index) => {
+                let actualLink = result.url;
+                if (!actualLink.match(/^https?:\/\//i)) actualLink = 'https://' + actualLink;
+
+                let displayUrl = actualLink;
+                let hostname = 'unknown';
+                try {
+                    const urlObj = new URL(actualLink);
+                    hostname = urlObj.hostname;
+                    const path = urlObj.pathname.replace(/\/$/, '').replace(/\//g, ' › ');
+                    displayUrl = `${hostname}${path}`;
+                } catch (e) {}
+
+                // Upgraded: Use DuckDuckGo's highly reliable transparent icon service
+                const faviconUrl = `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+                
+                // Fallback: Generates a beautiful UI-Avatar matching our dark theme with the site's first letter
+                const fallbackIcon = `https://ui-avatars.com/api/?name=${hostname.charAt(0)}&background=303134&color=fff&size=64&bold=true`;
+                const highlightedTitle = highlightText(result.title, currentQuery);
+
+                return `
+                    <div class="fade-in group w-full" style="animation-delay: ${index * 0.04}s">
+                        <div class="flex items-center justify-between text-sm text-textMain mb-1.5 max-w-2xl">
+                            <div class="flex items-center gap-3">
+                                <img src="${faviconUrl}" alt="" class="w-6 h-6 bg-card border border-gray-700/50 rounded-full object-contain" onerror="this.onerror=null; this.src='${fallbackIcon}'">
+                                <span class="truncate tracking-wide text-xs text-textMuted">${displayUrl}</span>
+                            </div>
+                            
+                            <!-- Share / Copy Link QoL Action -->
+                            <button onclick="copyUrlToClipboard('${actualLink}', this)" class="p-1 text-textMuted hover:text-accent opacity-0 group-hover:opacity-100 transition-all rounded" title="Copy Link to Clipboard">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        
+                        <a href="${actualLink}" target="_blank" rel="noopener noreferrer" class="text-[20px] leading-tight text-accent hover:underline font-medium block mb-1">
+                            ${highlightedTitle}
+                        </a>
+                        
+                        <div class="text-sm">
+                            <span class="text-textMuted mr-3">Score: ${result.score.toLocaleString()}</span>
+                            <span class="text-textMuted leading-relaxed">
+                                <span class="text-gray-500 text-[11px] uppercase tracking-wider mr-1">Matched:</span> 
+                                ${result.keywords}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsContainer.innerHTML = resultsHTML;
+            lucide.createIcons();
+        }
+
+        // Render Videos Tab
+        function renderVideos(results, query) {
+            const videoResults = results.filter(r => isVideoURL(r.url));
+            
+            if (videoResults.length === 0) {
+                videosEmptyState.classList.remove('hidden');
+                videosContainer.innerHTML = '';
+                return;
+            }
+            videosEmptyState.classList.add('hidden');
+            
+            const html = videoResults.map((result, index) => {
+                let actualLink = result.url.match(/^https?:\/\//i) ? result.url : 'https://' + result.url;
+                let ytId = getYouTubeId(actualLink);
+                let hostname = new URL(actualLink).hostname.replace('www.', '');
+                
+                let thumbHtml = ytId 
+                    ? `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">`
+                    : `<div class="w-full h-full flex items-center justify-center bg-gray-800 group-hover:bg-gray-700 transition-colors"><i data-lucide="play-circle" class="w-12 h-12 text-gray-500"></i></div>`;
+                    
+                const highlightedTitle = highlightText(result.title, query);
+                
+                return `
+                    <a href="${actualLink}" target="_blank" class="fade-in group block bg-card rounded-xl overflow-hidden border border-gray-700/50 hover:border-gray-500 transition-colors shadow-sm" style="animation-delay: ${index * 0.05}s">
+                        <div class="aspect-video w-full bg-dark overflow-hidden relative border-b border-gray-700/50">
+                            ${thumbHtml}
+                            <div class="absolute bottom-2 left-2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded font-medium backdrop-blur-sm">VIDEO</div>
+                        </div>
+                        <div class="p-4">
+                            <h3 class="text-[15px] font-medium text-gray-200 line-clamp-2 leading-snug hover:text-accent transition-colors" title="${result.title}">${highlightedTitle}</h3>
+                            <div class="flex items-center gap-2 mt-3 text-xs text-textMuted">
+                                <span class="truncate capitalize">${hostname}</span>
+                            </div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+            
+            videosContainer.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // Render News Tab
+        function renderNews(results, query) {
+            const newsResults = results.filter(r => {
+                if (!isNewsURL(r.url)) return false;
+                
+                // Exclude homepages and base index files (depth must be > 0)
+                try {
+                    let checkUrl = r.url.match(/^https?:\/\//i) ? r.url : 'https://' + r.url;
+                    let urlObj = new URL(checkUrl);
+                    let path = urlObj.pathname.replace(/\/$/, '').toLowerCase();
+                    
+                    if (!path || path === '' || path === '/index.html' || path === '/index.php' || path === '/index.htm') {
+                        return false;
+                    }
+                    return true;
+                } catch(e) {
+                    return false;
+                }
+            });
+            
+            if (newsResults.length === 0) {
+                newsEmptyState.classList.remove('hidden');
+                newsContainer.innerHTML = '';
+                return;
+            }
+            newsEmptyState.classList.add('hidden');
+            
+            const html = newsResults.map((result, index) => {
+                let actualLink = result.url.match(/^https?:\/\//i) ? result.url : 'https://' + result.url;
+                let hostname = 'unknown';
+                try {
+                    hostname = new URL(actualLink).hostname;
+                } catch (e) {}
+
+                const faviconUrl = `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+                const fallbackIcon = `https://ui-avatars.com/api/?name=${hostname.charAt(0)}&background=303134&color=fff&size=64&bold=true`;
+                const highlightedTitle = highlightText(result.title, query);
+
+                return `
+                    <div class="fade-in group w-full bg-card p-5 rounded-xl border border-gray-700/50 hover:border-gray-500 transition-colors shadow-sm" style="animation-delay: ${index * 0.04}s">
+                        <div class="flex items-center justify-between text-sm text-textMain mb-2.5">
+                            <div class="flex items-center gap-3">
+                                <img src="${faviconUrl}" alt="" class="w-5 h-5 bg-card border border-gray-700/50 rounded-full object-contain" onerror="this.onerror=null; this.src='${fallbackIcon}'">
+                                <span class="font-semibold tracking-wide text-[11px] text-gray-400 uppercase">${hostname.replace('www.', '')}</span>
+                            </div>
+                            
+                            <!-- Share / Copy Link QoL Action -->
+                            <button onclick="copyUrlToClipboard('${actualLink}', this)" class="p-1 text-textMuted hover:text-accent opacity-0 group-hover:opacity-100 transition-all rounded" title="Copy Link to Clipboard">
+                                <i data-lucide="copy" class="w-4.5 h-4.5"></i>
+                            </button>
+                        </div>
+                        
+                        <a href="${actualLink}" target="_blank" rel="noopener noreferrer" class="text-[19px] leading-snug text-accent hover:underline font-medium block mb-3">
+                            ${highlightedTitle}
+                        </a>
+                        
+                        <div class="text-sm">
+                            <span class="text-textMuted leading-relaxed">
+                                <span class="text-gray-500 text-[11px] uppercase tracking-wider mr-1">Tags:</span> 
+                                ${result.keywords}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            newsContainer.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // Wikipedia Knowledge Panel
+        async function fetchWikipediaSummary(query) {
+            wikiPanel.innerHTML = '';
+            try {
+                // Ensure spaces are properly transformed for the direct page summary API
+                const wikiTitle = encodeURIComponent(query.trim().replace(/\s+/g, '_'));
+                const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (data.type === 'disambiguation' || data.type === 'no-extract') return;
+
+                // Safely grab the highest quality image available without forcing a resolution that might 404
+                let imgHtml = '';
+                if (data.originalimage && data.originalimage.source) {
+                    imgHtml = `<img src="${data.originalimage.source}" alt="${data.title}" class="w-full h-48 object-cover rounded-t-xl border-b border-gray-700/50">`;
+                } else if (data.thumbnail && data.thumbnail.source) {
+                    imgHtml = `<img src="${data.thumbnail.source}" alt="${data.title}" class="w-full h-48 object-cover rounded-t-xl border-b border-gray-700/50">`;
+                }
+
+                wikiPanel.innerHTML = `
+                    <div class="bg-card border border-gray-700/50 rounded-xl shadow-lg overflow-hidden fade-in">
+                        ${imgHtml}
+                        <div class="p-5 sm:p-6">
+                            <div class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Wikipedia
+                            </div>
+                            <h2 class="text-2xl font-normal text-gray-100 mb-1">${data.title}</h2>
+                            <p class="text-sm text-textMuted mb-4 italic border-b border-gray-700/50 pb-3">${data.description || 'Encyclopedia Article'}</p>
+                            
+                            <p class="text-[13px] text-textMain leading-relaxed line-clamp-6 mb-4">
+                                ${data.extract}
+                            </p>
+                            
+                            <a href="${data.content_urls.desktop.page}" target="_blank" class="inline-flex items-center gap-1.5 text-accent hover:text-blue-300 text-sm font-medium transition-colors">
+                                Read more <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+                wikiPanel.classList.remove('hidden');
+                lucide.createIcons();
+            } catch (error) {}
+        }
+
+        // Fetch Related Images for Images Tab
+        async function fetchImages(query) {
+            imagesContainer.innerHTML = '';
+            imagesEmptyState.classList.add('hidden');
+            
+            try {
+                // We use Wikipedia's "Action Search API" instead of "Related Pages". 
+                // This is extremely robust and fuzzy, guaranteeing images even if the query is lowercase or slightly misspelled.
+                const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=15&prop=pageimages&pithumbsize=600&format=json&origin=*`;
+                
+                const response = await fetch(searchUrl);
+                if (!response.ok) throw new Error('API Error');
+                
+                const data = await response.json();
+                if (!data.query || !data.query.pages) throw new Error('No images found');
+                
+                // Filter out any wiki pages that do not have a primary thumbnail
+                const pagesWithImages = Object.values(data.query.pages).filter(p => p.thumbnail && p.thumbnail.source);
+                
+                if (pagesWithImages.length === 0) throw new Error('No images');
+
+                const imagesHTML = pagesWithImages.map((page, index) => {
+                    const imgUrl = page.thumbnail.source;
+                    const wikiLink = `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/\s+/g, '_'))}`;
+                    
+                    return `
+                        <a href="${wikiLink}" target="_blank" class="fade-in group block bg-card rounded-xl overflow-hidden border border-gray-700/50 hover:border-gray-500 transition-colors shadow-sm" style="animation-delay: ${index * 0.05}s">
+                            <div class="aspect-square w-full bg-dark overflow-hidden">
+                                <img src="${imgUrl}" alt="${page.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+                            </div>
+                            <div class="p-3">
+                                <h3 class="text-sm font-medium text-gray-200 truncate" title="${page.title}">${page.title}</h3>
+                                <p class="text-xs text-textMuted truncate mt-0.5">Wikipedia Source</p>
+                            </div>
+                        </a>
+                    `;
+                }).join('');
+
+                imagesContainer.innerHTML = imagesHTML;
+            } catch (error) {
+                imagesEmptyState.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
